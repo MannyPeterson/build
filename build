@@ -34,6 +34,12 @@ do_checks() {
     exit 1
   fi
 
+  if [[ ! -f $LESS ]]
+  then
+    echo "build: error: $LESS not found!"
+    exit 1
+  fi
+
   if [[ ! -f $ARDUINOCLI ]]
   then
     echo "build: error: $ARDUINOCLI not found!"
