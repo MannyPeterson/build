@@ -1,0 +1,134 @@
+#!/bin/bash
+
+PROJECT=HeliOS
+BOARD_AVR=arduino:avr:uno
+BOARD_SAM=arduino:sam
+BOARD_SAMD=arduino:samd:arduino_zero_native
+DIR_HOME=~
+DIR_ARDUINO=$DIR_HOME/Arduino
+DIR_LIBRARIES=$DIR_ARDUINO/libraries
+DIR_LIBRARY=$DIR_LIBRARIES/$PROJECT
+DIR_EXAMPLES=$DIR_LIBRARIES/$PROJECT/examples
+DIR_GITREPO=$DIR_HOME/github/$PROJECT
+LOG_FILE=$DIR_HOME/build.log
+
+RM=/usr/bin/rm
+CP=/usr/bin/cp
+LESS=/usr/bin/less
+ARDUINOCLI=$HOME/bin/arduino-cli
+
+git_branch() {
+  git -C $DIR_GITREPO branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/(\1)/'
+}
+
+do_checks() {
+  if [[ ! -f $RM ]]
+  then
+    echo "build: error: $RM not found!"
+    exit 1
+  fi
+
+  if [[ ! -f $CP ]]
+  then
+    echo "build: error: $CP not found!"
+    exit 1
+  fi
+
+  if [[ ! -f $ARDUINOCLI ]]
+  then
+    echo "build: error: $ARDUINOCLI not found!"
+    exit 1
+  fi
+
+  if [[ ! -d $DIR_HOME ]]
+  then
+    echo "build: error: $DIR_HOME not found!"
+    exit 1
+  fi
+  
+  if [[ ! -d $DIR_ARDUINO ]]
+  then
+    echo "build: error: $DIR_ARDUINO not found!"
+    exit 1
+  fi
+  
+  if [[ ! -d $DIR_LIBRARIES ]]
+  then
+    echo "build: error: $DIR_LIBRARIES not found!"
+    exit 1
+  fi
+  
+  if [[ ! -d $DIR_GITREPO ]]
+  then
+    echo "build: error: $DIR_GITREPO not found!"
+    exit 1
+  fi
+  
+  if [ "$(git_branch)" != "(develop)" ]
+  then
+    echo "build: error: $DIR_GITREPO working branch is $(git_branch)!"
+    exit 1
+  fi
+}
+
+clear_log() {
+  if [[ -d $DIR_LIBRARY ]]
+  then
+    echo "build: removing log file."
+    $RM -f $LOG_FILE
+  fi
+}
+
+install_lib() {
+  if [[ -d $DIR_LIBRARY ]]
+  then
+    echo "build: removing library $PROJECT."
+    $RM -rf $DIR_LIBRARY
+  fi
+
+  echo "build: installing library $PROJECT."
+  $CP -r $DIR_GITREPO $DIR_LIBRARIES
+}
+
+install_ex() {
+  for DIR in $DIR_ARDUINO/*; do
+    if [ $DIR != $DIR_LIBRARIES ]
+    then
+      echo "build: removing example $(basename $DIR)."
+      $RM -rf $DIR	
+    fi
+  done
+
+  for DIR in $DIR_LIBRARY/examples/*; do
+    echo "build: installing example $(basename $DIR)."
+    $CP -r $DIR $DIR_ARDUINO
+  done
+}
+
+build_ex() {
+  BOARD=$1
+  for DIR in $DIR_ARDUINO/*; do
+    if [ $DIR != $DIR_LIBRARIES ]
+    then
+      echo "build: compiling example $(basename $DIR) for $BOARD."
+      $ARDUINOCLI compile --dry-run --warnings all --verbose --fqbn $BOARD $DIR > $LOG_FILE 2> $LOG_FILE
+      EXIT_STATUS=$?
+      if [ $EXIT_STATUS -ne 0 ]
+      then
+        $LESS $LOG_FILE
+        exit 1
+      fi
+    fi
+  done
+}
+
+
+do_checks
+clear_log
+install_lib
+install_ex
+build_ex $BOARD_AVR
+build_ex $BOARD_SAMD
+clear_log
+
+exit 0
