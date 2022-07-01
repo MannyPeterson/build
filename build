@@ -1,7 +1,6 @@
 #!/bin/bash
 
 
-
 PROJECT=HeliOS
 BOARD_AVR=arduino:avr:uno
 BOARD_SAM=arduino:sam
